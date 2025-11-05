@@ -408,7 +408,7 @@ export default function DraftPage() {
                         {match.current_team === "red"
                           ? match.team_red_name
                           : match.team_blue_name}
-                        's turn
+                        &apos;s turn
                       </div>
                     )}
                   </div>
