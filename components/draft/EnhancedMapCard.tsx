@@ -52,7 +52,7 @@ export function EnhancedMapCard({
       transition={{ duration: 0.2 }}
     >
       {/* Background Image */}
-      <div className="relative h-32 overflow-hidden">
+      <div className="relative h-44 overflow-hidden">
         <img
           src={beatmap.cover_url}
           alt={beatmap.title}
@@ -95,32 +95,32 @@ export function EnhancedMapCard({
         </div>
 
         {/* Map Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-2">
-          <div className="text-white font-bold text-sm leading-tight mb-0.5 line-clamp-1">
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="text-white font-bold text-base leading-tight mb-1 line-clamp-1">
             {beatmap.title}
           </div>
-          <div className="text-white/80 text-xs mb-1 line-clamp-1">
+          <div className="text-white/80 text-sm mb-1.5 line-clamp-1">
             {beatmap.artist}
           </div>
 
           {/* Stats Row */}
-          <div className="flex gap-1 text-xs">
+          <div className="flex gap-1.5 text-xs">
             {/* Length */}
-            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
-              <Clock className="w-2.5 h-2.5 text-blue-400" />
+            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-1.5 py-1">
+              <Clock className="w-3 h-3 text-blue-400" />
               <span className="text-white text-xs">
                 {formatTime(beatmap.length)}
               </span>
             </div>
 
             {/* BPM */}
-            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
-              <Music2 className="w-2.5 h-2.5 text-pink-400" />
+            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-1.5 py-1">
+              <Music2 className="w-3 h-3 text-pink-400" />
               <span className="text-white text-xs">{Math.round(beatmap.bpm)}</span>
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
+            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-1.5 py-1">
               <span className="text-white/60 text-xs">AR</span>
               <span className="text-white text-xs">{beatmap.ar}</span>
             </div>

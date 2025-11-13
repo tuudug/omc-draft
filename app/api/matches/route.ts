@@ -69,7 +69,14 @@ export async function POST(request: NextRequest) {
     await startMatch(matchData.id);
 
     // Return match data with URLs
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
+    // Try environment variable first, then use request headers to detect actual domain
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (!baseUrl) {
+      const host = request.headers.get('host');
+      const protocol = request.headers.get('x-forwarded-proto') || 'https';
+      baseUrl = `${protocol}://${host}`;
+    }
 
     return NextResponse.json({
       match_id: matchData.id,

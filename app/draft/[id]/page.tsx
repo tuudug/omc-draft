@@ -486,9 +486,18 @@ export default function DraftPage() {
                   ? match.team_blue_name
                   : match.team_red_name
               }
-              canSelect={isCaptain && myTeam === match.roll_winner}
+              loserColor={
+                match.roll_winner === "red" ? teamBlueColor : teamRedColor
+              }
+              canSelect={isCaptain && myTeam === match.current_team}
               onSelect={handlePreferenceSelect}
-              selectedPreference={match.roll_winner_preference}
+              winnerPreference={match.roll_winner_preference}
+              loserPreference={match.roll_loser_preference}
+              currentTeam={
+                match.current_team === "tiebreaker"
+                  ? null
+                  : match.current_team
+              }
             />
           </motion.div>
         )}
@@ -649,7 +658,7 @@ export default function DraftPage() {
                         </h3>
                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-purple-500/50"></div>
                       </div>
-                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {maps.map((map) => {
                           const isBanned = actions.some(
                             (a) => a.action_type === "ban" && a.beatmap_id === map.id

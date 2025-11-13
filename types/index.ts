@@ -62,6 +62,7 @@ export interface Match {
   team_red_logo_url?: string;
   team_blue_logo_url?: string;
   roll_winner_preference?: RollPreference | null;
+  roll_loser_preference?: RollPreference | null;
   tournament_name?: string;
   tournament_logo_url?: string;
 }

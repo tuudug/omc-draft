@@ -9,9 +9,12 @@ interface PreferenceSelectorProps {
   winnerName: string;
   winnerColor: string;
   loserName: string;
+  loserColor: string;
   canSelect: boolean;
   onSelect: (preference: RollPreference) => void;
-  selectedPreference?: RollPreference | null;
+  winnerPreference?: RollPreference | null;
+  loserPreference?: RollPreference | null;
+  currentTeam?: "red" | "blue" | null;
 }
 
 const preferences: Array<{
@@ -56,10 +59,21 @@ export function PreferenceSelector({
   winnerName,
   winnerColor,
   loserName,
+  loserColor,
   canSelect,
   onSelect,
-  selectedPreference,
+  winnerPreference,
+  loserPreference,
+  currentTeam,
 }: PreferenceSelectorProps) {
+  // Determine if we're in winner or loser selection phase
+  const isWinnerSelecting = currentTeam === winnerTeam && !winnerPreference;
+  const isLoserSelecting = currentTeam !== winnerTeam && winnerPreference && !loserPreference;
+
+  // Get the current selecting team info
+  const currentTeamName = currentTeam === winnerTeam ? winnerName : loserName;
+  const currentTeamColor = currentTeam === winnerTeam ? winnerColor : loserColor;
+
   // Determine what the loser gets based on winner's selection
   const getLoserPreference = (winnerPref: RollPreference): string => {
     const map: Record<RollPreference, string> = {
@@ -83,10 +97,12 @@ export function PreferenceSelector({
           {winnerName} Won the Roll!
         </div>
         <div className="text-sm text-white/80">
-          {canSelect
+          {isWinnerSelecting && canSelect
             ? "Choose your preference:"
-            : selectedPreference
-            ? `Selected: ${preferences.find((p) => p.value === selectedPreference)?.label}`
+            : isLoserSelecting && canSelect
+            ? `${currentTeamName}, choose from remaining options:`
+            : winnerPreference && loserPreference
+            ? "Both teams selected!"
             : "Waiting for selection..."}
         </div>
       </motion.div>
@@ -95,13 +111,21 @@ export function PreferenceSelector({
       <div className="grid grid-cols-4 gap-2 mb-3">
         {preferences.map((pref, index) => {
           const Icon = pref.icon;
-          const isSelected = selectedPreference === pref.value;
-          const isDisabled = !canSelect || (selectedPreference !== null && !isSelected);
+          const isWinnerSelected = winnerPreference === pref.value;
+          const isLoserSelected = loserPreference === pref.value;
+          const isSelected = isWinnerSelected || isLoserSelected;
+          const isDisabled =
+            !canSelect ||
+            (isLoserSelecting && isWinnerSelected) || // Loser can't select winner's choice
+            (winnerPreference !== null && loserPreference !== null); // Both already selected
+
+          // Determine the color for selected items
+          const selectedColor = isWinnerSelected ? winnerColor : isLoserSelected ? loserColor : currentTeamColor;
 
           return (
             <motion.button
               key={pref.value}
-              onClick={() => canSelect && !selectedPreference && onSelect(pref.value)}
+              onClick={() => canSelect && !isDisabled && onSelect(pref.value)}
               disabled={isDisabled}
               className={`relative rounded-lg p-3 border-2 transition-all ${
                 isSelected
@@ -112,7 +136,7 @@ export function PreferenceSelector({
               }`}
               style={{
                 background: isSelected
-                  ? `linear-gradient(135deg, ${winnerColor}, ${winnerColor}dd)`
+                  ? `linear-gradient(135deg, ${selectedColor}, ${selectedColor}dd)`
                   : `linear-gradient(135deg, var(--tw-gradient-stops))`,
               }}
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -160,29 +184,35 @@ export function PreferenceSelector({
       </div>
 
       {/* Result Summary */}
-      {selectedPreference && (
+      {(winnerPreference || loserPreference) && (
         <motion.div
           className="bg-black/40 backdrop-blur-md rounded-lg p-3 border border-white/20"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex items-center justify-center gap-6">
-            {/* Winner Gets */}
+            {/* Winner Selection */}
             <div className="text-center">
-              <div className="text-xs text-white/60 mb-1">Winner ({winnerName})</div>
+              <div className="text-xs text-white/60 mb-1">{winnerName}</div>
               <div className="text-sm font-bold" style={{ color: winnerColor }}>
-                {preferences.find((p) => p.value === selectedPreference)?.label}
+                {winnerPreference
+                  ? preferences.find((p) => p.value === winnerPreference)?.label
+                  : "Selecting..."}
               </div>
             </div>
 
             {/* Divider */}
             <div className="h-8 w-px bg-white/20" />
 
-            {/* Loser Gets */}
+            {/* Loser Selection */}
             <div className="text-center">
-              <div className="text-xs text-white/60 mb-1">Loser ({loserName})</div>
-              <div className="text-sm font-bold text-white">
-                {getLoserPreference(selectedPreference)}
+              <div className="text-xs text-white/60 mb-1">{loserName}</div>
+              <div className="text-sm font-bold" style={{ color: loserColor }}>
+                {loserPreference
+                  ? preferences.find((p) => p.value === loserPreference)?.label
+                  : winnerPreference
+                  ? "Selecting..."
+                  : "Waiting..."}
               </div>
             </div>
           </div>
