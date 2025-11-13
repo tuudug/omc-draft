@@ -108,6 +108,7 @@ export async function processMatchAction(
         .update({
           roll_winner_preference: preference,
           current_team: loserTeam,
+          status: "preference_selection",
           timer_ends_at: new Date(Date.now() + TIMER_DURATION * 1000).toISOString(),
         } as never)
         .eq("id", matchId);
