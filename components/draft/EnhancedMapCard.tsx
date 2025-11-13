@@ -43,16 +43,16 @@ export function EnhancedMapCard({
   return (
     <motion.div
       layout
-      className={`relative rounded-xl overflow-hidden group shadow-lg ${
+      className={`relative rounded-lg overflow-hidden group shadow-md ${
         canInteract ? "cursor-pointer" : ""
-      } ${isTiebreaker ? "ring-2 ring-yellow-500" : ""}`}
+      } ${isTiebreaker ? "ring-1 ring-yellow-500" : ""}`}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
-      whileHover={canInteract ? { scale: 1.05, zIndex: 10 } : {}}
+      whileHover={canInteract ? { scale: 1.03, zIndex: 10 } : {}}
       transition={{ duration: 0.2 }}
     >
       {/* Background Image */}
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-32 overflow-hidden">
         <img
           src={beatmap.cover_url}
           alt={beatmap.title}
@@ -71,9 +71,9 @@ export function EnhancedMapCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
 
         {/* Mod Badge */}
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-1 left-1">
           <div
-            className={`px-3 py-1 rounded-lg font-bold text-sm shadow-lg ${
+            className={`px-2 py-0.5 rounded font-bold text-xs shadow ${
               isTiebreaker
                 ? "bg-yellow-500 text-black"
                 : "bg-purple-600 text-white"
@@ -85,46 +85,44 @@ export function EnhancedMapCard({
         </div>
 
         {/* Star Rating */}
-        <div className="absolute top-2 right-2">
-          <div className="flex items-center gap-1 px-3 py-1 bg-black/80 backdrop-blur-sm rounded-lg">
-            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-            <span className="text-white font-bold text-sm">
+        <div className="absolute top-1 right-1">
+          <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-black/80 backdrop-blur-sm rounded">
+            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+            <span className="text-white font-bold text-xs">
               {beatmap.star_rating.toFixed(2)}
             </span>
           </div>
         </div>
 
         {/* Map Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <div className="text-white font-bold text-lg leading-tight mb-1 line-clamp-1">
+        <div className="absolute bottom-0 left-0 right-0 p-2">
+          <div className="text-white font-bold text-sm leading-tight mb-0.5 line-clamp-1">
             {beatmap.title}
           </div>
-          <div className="text-white/80 text-sm mb-2 line-clamp-1">
-            {beatmap.artist} - {beatmap.difficulty_name}
+          <div className="text-white/80 text-xs mb-1 line-clamp-1">
+            {beatmap.artist}
           </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="flex gap-1 text-xs">
             {/* Length */}
-            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-2 py-1">
-              <Clock className="w-3 h-3 text-blue-400" />
-              <span className="text-white font-medium">
+            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
+              <Clock className="w-2.5 h-2.5 text-blue-400" />
+              <span className="text-white text-xs">
                 {formatTime(beatmap.length)}
               </span>
             </div>
 
             {/* BPM */}
-            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-2 py-1">
-              <Music2 className="w-3 h-3 text-pink-400" />
-              <span className="text-white font-medium">{beatmap.bpm}</span>
+            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
+              <Music2 className="w-2.5 h-2.5 text-pink-400" />
+              <span className="text-white text-xs">{Math.round(beatmap.bpm)}</span>
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded px-2 py-1">
-              <span className="text-white/60">CS</span>
-              <span className="text-white font-medium">{beatmap.cs}</span>
-              <span className="text-white/60">AR</span>
-              <span className="text-white font-medium">{beatmap.ar}</span>
+            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded px-1 py-0.5">
+              <span className="text-white/60 text-xs">AR</span>
+              <span className="text-white text-xs">{beatmap.ar}</span>
             </div>
           </div>
         </div>
@@ -135,10 +133,10 @@ export function EnhancedMapCard({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 bg-gradient-to-br from-red-600/90 to-gray-900/90 flex flex-col items-center justify-center border-4 border-red-500"
+          className="absolute inset-0 bg-gradient-to-br from-red-600/90 to-gray-900/90 flex flex-col items-center justify-center border-2 border-red-500"
         >
-          <Ban className="w-16 h-16 text-white mb-2" />
-          <span className="text-white font-bold text-2xl uppercase tracking-wider">
+          <Ban className="w-8 h-8 text-white mb-1" />
+          <span className="text-white font-bold text-sm uppercase tracking-wide">
             BANNED
           </span>
         </motion.div>
@@ -149,29 +147,25 @@ export function EnhancedMapCard({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 flex flex-col items-center justify-center border-4"
+          className="absolute inset-0 flex flex-col items-center justify-center border-2"
           style={{
             backgroundColor: `${teamColor}cc`,
             borderColor: teamColor,
           }}
         >
-          <Trophy className="w-16 h-16 text-white mb-2" />
-          <span className="text-white font-bold text-2xl uppercase tracking-wider">
+          <Trophy className="w-8 h-8 text-white mb-1" />
+          <span className="text-white font-bold text-sm uppercase tracking-wide">
             PICKED
-          </span>
-          <span className="text-white/90 text-lg mt-1">
-            {pickedByTeam === "red" ? "RED TEAM" : "BLUE TEAM"}
           </span>
         </motion.div>
       )}
 
       {/* Tiebreaker Lock */}
       {isLocked && isTiebreaker && !isBanned && !isPicked && (
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/50 to-orange-600/50 flex flex-col items-center justify-center border-4 border-yellow-500 pointer-events-none">
-          <span className="text-white font-bold text-lg uppercase tracking-wider">
-            🔒 TIEBREAKER 🔒
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/50 to-orange-600/50 flex flex-col items-center justify-center border-2 border-yellow-500 pointer-events-none">
+          <span className="text-white font-bold text-xs uppercase tracking-wide">
+            🔒 TIEBREAKER
           </span>
-          <span className="text-white/90 text-sm mt-1">Final Map</span>
         </div>
       )}
 
@@ -186,8 +180,8 @@ export function EnhancedMapCard({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <Shield className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity mb-2" />
-          <span className="text-white font-bold text-2xl opacity-0 group-hover:opacity-100 transition-opacity">
+          <Shield className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity mb-1" />
+          <span className="text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
             BAN
           </span>
         </motion.button>
@@ -203,8 +197,8 @@ export function EnhancedMapCard({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <Trophy className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity mb-2" />
-          <span className="text-white font-bold text-2xl opacity-0 group-hover:opacity-100 transition-opacity">
+          <Trophy className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity mb-1" />
+          <span className="text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
             PICK
           </span>
         </motion.button>

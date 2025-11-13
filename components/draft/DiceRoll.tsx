@@ -46,7 +46,7 @@ export function DiceRoll({
   const displayValue = rollValue !== null && !isRolling ? rollValue : animatedValue;
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-2">
       {/* Dice Display */}
       <motion.div
         className="relative"
@@ -54,7 +54,7 @@ export function DiceRoll({
         transition={{ duration: 0.5, repeat: isRolling ? Infinity : 0, ease: "linear" }}
       >
         <motion.div
-          className={`w-32 h-32 rounded-2xl flex items-center justify-center text-6xl font-bold text-white shadow-2xl`}
+          className={`w-20 h-20 rounded-xl flex items-center justify-center text-4xl font-bold text-white shadow-xl`}
           style={{
             backgroundColor: teamColor,
             boxShadow: `0 0 60px ${teamColor}80`,
@@ -112,7 +112,7 @@ export function DiceRoll({
       </motion.div>
 
       {/* Team Name */}
-      <div className="text-2xl font-bold" style={{ color: teamColor }}>
+      <div className="text-lg font-bold" style={{ color: teamColor }}>
         {teamName}
       </div>
 
@@ -120,7 +120,7 @@ export function DiceRoll({
       {canRoll && rollValue === null && !isRolling && (
         <motion.button
           onClick={onRoll}
-          className="px-8 py-4 rounded-xl font-bold text-xl text-white shadow-lg"
+          className="px-4 py-2 rounded-lg font-bold text-sm text-white shadow-lg"
           style={{
             background: `linear-gradient(135deg, ${teamColor}, ${teamColor}dd)`,
           }}
@@ -142,7 +142,7 @@ export function DiceRoll({
       {/* Rolling Status */}
       {isRolling && (
         <motion.div
-          className="text-lg font-bold text-white"
+          className="text-sm font-bold text-white"
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 0.5, repeat: Infinity }}
         >
@@ -153,7 +153,7 @@ export function DiceRoll({
       {/* Result Status */}
       {rollValue !== null && !isRolling && (
         <motion.div
-          className="text-lg font-bold"
+          className="text-sm font-bold"
           style={{ color: teamColor }}
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}

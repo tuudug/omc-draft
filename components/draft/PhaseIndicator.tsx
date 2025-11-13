@@ -75,10 +75,10 @@ export function PhaseIndicator({
   const displayColor = currentTeam && teamColor ? teamColor : config.color;
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex items-center justify-center gap-3">
       {/* Main Phase Display */}
       <motion.div
-        className={`relative overflow-hidden rounded-2xl px-12 py-6 bg-gradient-to-r ${config.gradient} shadow-2xl`}
+        className={`relative overflow-hidden rounded-lg px-6 py-2 bg-gradient-to-r ${config.gradient} shadow-lg`}
         animate={
           isUrgent
             ? {
@@ -106,7 +106,7 @@ export function PhaseIndicator({
           }}
         />
 
-        <div className="relative z-10 flex items-center gap-4">
+        <div className="relative z-10 flex items-center gap-2">
           <motion.div
             animate={{ rotate: status === "rolling" ? 360 : 0 }}
             transition={{
@@ -115,16 +115,16 @@ export function PhaseIndicator({
               ease: "linear",
             }}
           >
-            <Icon className="w-10 h-10 text-white" />
+            <Icon className="w-5 h-5 text-white" />
           </motion.div>
 
-          <div>
-            <div className="text-white font-bold text-4xl uppercase tracking-wider">
+          <div className="flex items-center gap-2">
+            <div className="text-white font-bold text-lg uppercase tracking-wide">
               {config.label}
             </div>
             {currentTeam && currentTeamName && (
               <motion.div
-                className="text-white/90 text-xl mt-1"
+                className="text-white/90 text-sm"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
@@ -141,18 +141,18 @@ export function PhaseIndicator({
       {/* Action Counter */}
       {actionCounter && (
         <motion.div
-          className="px-6 py-3 bg-black/40 backdrop-blur-md rounded-xl border-2 border-white/20"
+          className="px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/20"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="text-white text-xl font-bold">{actionCounter}</div>
+          <div className="text-white text-sm font-bold">{actionCounter}</div>
         </motion.div>
       )}
 
       {/* Timer Display */}
       {timeRemaining !== undefined && timeRemaining > 0 && (
         <motion.div
-          className={`relative px-8 py-4 rounded-xl shadow-xl ${
+          className={`relative px-4 py-1 rounded-lg shadow-lg ${
             isUrgent
               ? "bg-red-600"
               : "bg-gradient-to-r from-purple-600/80 to-pink-600/80"
@@ -183,24 +183,12 @@ export function PhaseIndicator({
             />
           </div>
 
-          <div className="relative z-10 flex items-center gap-3">
-            <Timer className={`w-6 h-6 text-white ${isUrgent ? "animate-pulse" : ""}`} />
-            <div className="text-white font-bold text-4xl tabular-nums">
+          <div className="relative z-10 flex items-center gap-2">
+            <Timer className={`w-4 h-4 text-white ${isUrgent ? "animate-pulse" : ""}`} />
+            <div className="text-white font-bold text-2xl tabular-nums">
               {timeRemaining}s
             </div>
           </div>
-
-          {isUrgent && (
-            <motion.div
-              className="absolute -top-2 -right-2 px-3 py-1 bg-yellow-500 text-black font-bold text-sm rounded-full"
-              animate={{
-                scale: [1, 1.1, 1],
-              }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-            >
-              HURRY!
-            </motion.div>
-          )}
         </motion.div>
       )}
     </div>
