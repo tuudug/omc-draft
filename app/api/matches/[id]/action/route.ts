@@ -5,7 +5,7 @@ import { processMatchAction } from "@/lib/match-logic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { match_id, team, action_type, beatmap_id } = body;
+    const { match_id, team, action_type, beatmap_id, preference } = body;
 
     // Validate input
     if (!match_id || !team || !action_type) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Process match state transition
-    await processMatchAction(match_id, action_type, team);
+    await processMatchAction(match_id, action_type, team, preference);
 
     return NextResponse.json({ action });
   } catch (error) {
