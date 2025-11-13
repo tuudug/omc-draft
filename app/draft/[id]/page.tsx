@@ -3,9 +3,18 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Timer, Shield, Swords, Trophy } from "lucide-react";
+import { Trophy, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Match, Beatmap, MatchAction, Team } from "@/types";
+import type { Match, Beatmap, MatchAction, Team, RollPreference } from "@/types";
+
+// Import new components
+import { DiceRoll } from "@/components/draft/DiceRoll";
+import { PreferenceSelector } from "@/components/draft/PreferenceSelector";
+import { EnhancedMapCard } from "@/components/draft/EnhancedMapCard";
+import { PhaseIndicator } from "@/components/draft/PhaseIndicator";
+import { AudioManager } from "@/components/draft/AudioManager";
+import { AdminControls } from "@/components/draft/AdminControls";
+import { ExportModal } from "@/components/draft/ExportModal";
 
 export default function DraftPage() {
   const params = useParams();
@@ -14,21 +23,30 @@ export default function DraftPage() {
   const token = searchParams.get("token");
   const teamParam = searchParams.get("team") as Team | null;
 
+  // Match state
   const [match, setMatch] = useState<Match | null>(null);
   const [beatmaps, setBeatmaps] = useState<Beatmap[]>([]);
   const [actions, setActions] = useState<MatchAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCaptain, setIsCaptain] = useState(false);
-  const [myTeam, setMyTeam] = useState<Team | null>(null);
+  const [myTeam, setMyTeam] = useState<"red" | "blue" | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isHandlingTimeout, setIsHandlingTimeout] = useState(false);
   const [numBans, setNumBans] = useState(0);
   const [numPicks, setNumPicks] = useState(0);
 
+  // UI state
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [lastAction, setLastAction] = useState<string>("");
+
+  // Roll animation state
+  const [isRollingRed, setIsRollingRed] = useState(false);
+  const [isRollingBlue, setIsRollingBlue] = useState(false);
+
   // Fetch initial data
   useEffect(() => {
     if (!matchId || !token) return;
-
     fetchMatchData();
   }, [matchId, token]);
 
@@ -47,7 +65,6 @@ export default function DraftPage() {
           filter: `id=eq.${matchId}`,
         },
         (payload) => {
-          console.log("Match update:", payload);
           if (payload.new) {
             setMatch(payload.new as Match);
           }
@@ -62,9 +79,9 @@ export default function DraftPage() {
           filter: `match_id=eq.${matchId}`,
         },
         (payload) => {
-          console.log("Action update:", payload);
           if (payload.new) {
             setActions((prev) => [...prev, payload.new as MatchAction]);
+            setLastAction((payload.new as MatchAction).action_type);
           }
         }
       )
@@ -133,10 +150,10 @@ export default function DraftPage() {
 
       if (stageData) {
         setNumBans((stageData as { num_bans: number }).num_bans);
-        setNumPicks((stageData as { best_of: number }).best_of - 1); // Exclude TB
+        setNumPicks((stageData as { best_of: number }).best_of - 1);
       }
 
-      // Fetch beatmaps for this stage
+      // Fetch beatmaps
       const { data: beatmapData } = await supabase
         .from("beatmaps")
         .select("*")
@@ -167,19 +184,17 @@ export default function DraftPage() {
 
     try {
       if (match.status === "picking") {
-        // Auto-pick random available map (excluding TB)
         const availableMaps = getAvailableMaps();
         if (availableMaps.length > 0) {
           const randomMap =
             availableMaps[Math.floor(Math.random() * availableMaps.length)];
-          console.log(`⏰ TIMEOUT: Auto-picking random map for ${myTeam} team`);
-          await handlePick(randomMap.id, true); // Pass true to indicate it's a timeout pick
-        } else {
-          console.log("⚠️ TIMEOUT: No available maps to pick!");
+          await handlePick(randomMap.id, true);
         }
       } else if (match.status === "banning") {
-        // Skip ban
         await performAction("ban", null);
+      } else if (match.status === "preference_selection") {
+        // Auto-select first_pick as default
+        await handlePreferenceSelect("first_pick");
       }
     } finally {
       setIsHandlingTimeout(false);
@@ -188,6 +203,13 @@ export default function DraftPage() {
 
   const handleRoll = async () => {
     if (!isCaptain || !myTeam) return;
+
+    // Start rolling animation
+    if (myTeam === "red") {
+      setIsRollingRed(true);
+    } else {
+      setIsRollingBlue(true);
+    }
 
     const roll = Math.floor(Math.random() * 100) + 1;
 
@@ -198,38 +220,37 @@ export default function DraftPage() {
       } as never)
       .eq("id", matchId);
 
+    // Keep rolling animation for 2 seconds
+    setTimeout(() => {
+      if (myTeam === "red") {
+        setIsRollingRed(false);
+      } else {
+        setIsRollingBlue(false);
+      }
+    }, 2000);
+
     await performAction("roll", null);
+  };
+
+  const handlePreferenceSelect = async (preference: RollPreference) => {
+    if (!isCaptain || !myTeam || match?.current_team !== myTeam) return;
+    await performAction("preference", null, preference);
   };
 
   const handleBan = async (beatmapId: string | null) => {
     if (!isCaptain || !myTeam || match?.current_team !== myTeam) return;
-
-    if (beatmapId === null) {
-      console.log(`⏭️ ${myTeam} team skipped their ban`);
-    }
-
     await performAction("ban", beatmapId);
   };
 
   const handlePick = async (beatmapId: string, isTimeout: boolean = false) => {
     if (!isCaptain || !myTeam || match?.current_team !== myTeam) return;
-
-    // Show toast notification for timeout picks
-    if (isTimeout) {
-      const map = beatmaps.find((b) => b.id === beatmapId);
-      if (map) {
-        console.log(
-          `⏰ Time expired! Random pick: ${map.mod_pool}${map.mod_index} - ${map.title}`
-        );
-      }
-    }
-
     await performAction("pick", beatmapId);
   };
 
   const performAction = async (
-    actionType: "roll" | "ban" | "pick",
-    beatmapId: string | null
+    actionType: "roll" | "ban" | "pick" | "preference",
+    beatmapId: string | null,
+    preference?: RollPreference
   ) => {
     try {
       await fetch(`/api/matches/${matchId}/action`, {
@@ -240,6 +261,7 @@ export default function DraftPage() {
           team: myTeam,
           action_type: actionType,
           beatmap_id: beatmapId,
+          preference,
         }),
       });
     } catch (error) {
@@ -278,12 +300,13 @@ export default function DraftPage() {
       }))
       .filter((p) => p.beatmap);
 
-    // Add TB at the end if all picks are done (match completed or in progress)
+    // Add TB at the end if all picks are done
     if (
       match?.status === "completed" ||
       (picked.length > 0 &&
         match?.status !== "banning" &&
-        match?.status !== "rolling")
+        match?.status !== "rolling" &&
+        match?.status !== "preference_selection")
     ) {
       const tbMap = beatmaps.find((b) => b.mod_pool === "TB");
       if (tbMap && !picked.some((p) => p.beatmap.id === tbMap.id)) {
@@ -303,9 +326,20 @@ export default function DraftPage() {
     return acc;
   }, {} as Record<string, Beatmap[]>);
 
+  const getActionCounter = (): string => {
+    if (match?.status === "banning") {
+      const bansCount = actions.filter((a) => a.action_type === "ban").length;
+      return `Ban ${bansCount + 1} of ${numBans * 2}`;
+    } else if (match?.status === "picking") {
+      const picksCount = actions.filter((a) => a.action_type === "pick").length;
+      return `Pick ${picksCount + 1} of ${numPicks}`;
+    }
+    return "";
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
         <div className="text-white text-xl">Loading draft...</div>
       </div>
     );
@@ -313,230 +347,157 @@ export default function DraftPage() {
 
   if (!match) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
         <div className="text-white text-xl">Match not found</div>
       </div>
     );
   }
 
-  // Determine background glow based on current team's turn
-  const getBackgroundGlow = () => {
-    if (match.status === "waiting" || match.status === "completed") {
-      return ""; // No glow
-    }
-    if (match.current_team === "red") {
-      return "shadow-[0_0_100px_rgba(239,68,68,0.15)] bg-gradient-to-br from-red-950/20 via-transparent to-transparent";
-    }
-    if (match.current_team === "blue") {
-      return "shadow-[0_0_100px_rgba(59,130,246,0.15)] bg-gradient-to-br from-blue-950/20 via-transparent to-transparent";
-    }
-    return "";
-  };
+  const teamRedColor = match.team_red_color || "#EF4444";
+  const teamBlueColor = match.team_blue_color || "#3B82F6";
 
   return (
-    <div
-      className={`h-screen overflow-hidden flex flex-col transition-all duration-1000 ${getBackgroundGlow()}`}
-    >
-      {/* Top Header - Teams & Phase Info */}
-      <div className="flex-shrink-0">
-        <div
-          className={`relative overflow-hidden transition-all duration-1000 ${
-            match.current_team === "red"
-              ? "bg-gradient-to-r from-red-950/40 via-purple-950/20 to-transparent shadow-red-500/20"
-              : match.current_team === "blue"
-              ? "bg-gradient-to-r from-transparent via-purple-950/20 to-blue-950/40 shadow-blue-500/20"
-              : "bg-gradient-to-r from-purple-950/20 via-gray-950/20 to-purple-950/20"
-          } backdrop-blur-md border-b-2 ${
-            match.current_team === "red"
-              ? "border-red-500/30"
-              : match.current_team === "blue"
-              ? "border-blue-500/30"
-              : "border-purple-500/20"
-          }`}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 overflow-hidden">
+      {/* Audio Manager */}
+      <AudioManager
+        enabled={audioEnabled}
+        status={match.status}
+        timeRemaining={timeRemaining}
+        onBan={lastAction === "ban"}
+        onPick={lastAction === "pick"}
+        onRoll={lastAction === "roll"}
+      />
+
+      {/* Admin Controls */}
+      <AdminControls
+        isAdmin={isCaptain}
+        audioEnabled={audioEnabled}
+        onToggleAudio={() => setAudioEnabled(!audioEnabled)}
+        onExport={() => setShowExportModal(true)}
+        canUndo={false}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        match={match}
+        beatmaps={beatmaps}
+        actions={actions}
+      />
+
+      {/* Main Content */}
+      <div className="container mx-auto px-6 py-8">
+        {/* Tournament Header */}
+        <motion.div
+          className="text-center mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
         >
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              {/* Red Team */}
-              <motion.div
-                className={`flex-1 transition-all duration-500 ${
-                  match.current_team === "red" ? "scale-105" : "scale-100"
-                }`}
-                animate={
-                  match.current_team === "red"
-                    ? { opacity: [0.8, 1, 0.8] }
-                    : { opacity: 1 }
-                }
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg ${
-                      match.current_team === "red"
-                        ? "ring-4 ring-red-400/50 shadow-red-500/50"
-                        : ""
-                    }`}
-                  >
-                    <span className="text-white font-bold text-2xl">R</span>
-                  </div>
-                  <div>
-                    <div className="text-red-400 font-bold text-3xl tracking-wide">
-                      {match.team_red_name}
-                    </div>
-                    {match.team_red_roll && (
-                      <div className="text-white/80 text-lg">
-                        Roll: <span className="font-bold">{match.team_red_roll}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Center - Phase Info & Timer */}
-              <div className="flex flex-col items-center gap-3 px-8">
-                <div className="flex items-center gap-3">
-                  <Swords className="w-8 h-8 text-purple-400" />
-                  <div className="text-center">
-                    <div className="text-white font-bold text-2xl uppercase tracking-wider">
-                      {match.status === "waiting" && "Waiting"}
-                      {match.status === "rolling" && "Roll Phase"}
-                      {match.status === "banning" && "Ban Phase"}
-                      {match.status === "picking" && "Pick Phase"}
-                      {match.status === "completed" && "Completed"}
-                    </div>
-                    {(match.status === "banning" || match.status === "picking") && (
-                      <div className="text-gray-300 text-sm">
-                        {match.current_team === "red"
-                          ? match.team_red_name
-                          : match.team_blue_name}
-                        &apos;s turn
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {match.timer_ends_at && (
-                  <motion.div
-                    className={`flex items-center gap-3 px-6 py-3 rounded-xl ${
-                      timeRemaining <= 10
-                        ? "bg-red-600/90 shadow-lg shadow-red-500/50"
-                        : "bg-purple-600/80"
-                    }`}
-                    animate={
-                      timeRemaining <= 10
-                        ? { scale: [1, 1.1, 1], boxShadow: ["0 0 20px rgba(239, 68, 68, 0.5)", "0 0 40px rgba(239, 68, 68, 0.8)", "0 0 20px rgba(239, 68, 68, 0.5)"] }
-                        : {}
-                    }
-                    transition={{ duration: 0.6, repeat: Infinity }}
-                  >
-                    <Timer className="w-6 h-6 text-white" />
-                    <div className="text-white font-bold text-3xl tabular-nums">
-                      {timeRemaining}
-                    </div>
-                  </motion.div>
-                )}
-
-                {isCaptain && (
-                  <div className="text-pink-400 text-sm font-medium">
-                    Captain for{" "}
-                    {myTeam === "red" ? match.team_red_name : match.team_blue_name}
-                  </div>
-                )}
-
-                {isCaptain &&
-                  match.current_team === myTeam &&
-                  (match.status === "banning" || match.status === "picking") && (
-                    <motion.div
-                      className="px-4 py-2 bg-gradient-to-r from-pink-500/40 to-purple-500/40 rounded-lg border-2 border-pink-400/60"
-                      animate={{
-                        borderColor: [
-                          "rgba(244, 114, 182, 0.6)",
-                          "rgba(192, 132, 252, 0.8)",
-                          "rgba(244, 114, 182, 0.6)",
-                        ],
-                        boxShadow: [
-                          "0 0 20px rgba(244, 114, 182, 0.3)",
-                          "0 0 30px rgba(192, 132, 252, 0.5)",
-                          "0 0 20px rgba(244, 114, 182, 0.3)",
-                        ],
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      <div className="text-pink-100 font-bold text-sm uppercase">
-                        ⚡ Your turn to {match.status === "banning" ? "ban" : "pick"}!
-                      </div>
-                    </motion.div>
-                  )}
-              </div>
-
-              {/* Blue Team */}
-              <motion.div
-                className={`flex-1 transition-all duration-500 ${
-                  match.current_team === "blue" ? "scale-105" : "scale-100"
-                }`}
-                animate={
-                  match.current_team === "blue"
-                    ? { opacity: [0.8, 1, 0.8] }
-                    : { opacity: 1 }
-                }
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <div className="flex items-center gap-4 justify-end">
-                  <div>
-                    <div className="text-blue-400 font-bold text-3xl tracking-wide text-right">
-                      {match.team_blue_name}
-                    </div>
-                    {match.team_blue_roll && (
-                      <div className="text-white/80 text-lg text-right">
-                        Roll: <span className="font-bold">{match.team_blue_roll}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    className={`w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg ${
-                      match.current_team === "blue"
-                        ? "ring-4 ring-blue-400/50 shadow-blue-500/50"
-                        : ""
-                    }`}
-                  >
-                    <span className="text-white font-bold text-2xl">B</span>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Roll Button */}
-            {match.status === "rolling" &&
-              isCaptain &&
-              !actions.find((a) => a.team === myTeam && a.action_type === "roll") && (
-                <motion.button
-                  onClick={handleRoll}
-                  className="mt-4 mx-auto block px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all text-2xl shadow-lg"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  🎲 ROLL!
-                </motion.button>
-              )}
-
-            {/* Skip Ban Button */}
-            {match.status === "banning" &&
-              isCaptain &&
-              match.current_team === myTeam && (
-                <motion.button
-                  onClick={() => handleBan(null)}
-                  className="mt-4 mx-auto block px-6 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold rounded-lg transition-all text-sm border border-gray-500"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Skip Ban (No Ban)
-                </motion.button>
-              )}
+          <h1 className="text-5xl font-bold text-white mb-2">
+            {match.tournament_name || "osu! Mongolia Cup 2025"}
+          </h1>
+          <div className="text-2xl text-purple-300">
+            {match.team_red_name} vs {match.team_blue_name}
           </div>
+        </motion.div>
+
+        {/* Phase Indicator */}
+        <div className="mb-8">
+          <PhaseIndicator
+            status={match.status}
+            currentTeam={match.current_team === "red" || match.current_team === "blue" ? match.current_team : undefined}
+            currentTeamName={
+              match.current_team === "red"
+                ? match.team_red_name
+                : match.current_team === "blue"
+                ? match.team_blue_name
+                : undefined
+            }
+            teamColor={
+              match.current_team === "red"
+                ? teamRedColor
+                : match.current_team === "blue"
+                ? teamBlueColor
+                : undefined
+            }
+            timeRemaining={timeRemaining}
+            actionCounter={getActionCounter()}
+          />
         </div>
 
+        {/* Rolling Phase */}
+        {match.status === "rolling" && (
+          <motion.div
+            className="grid grid-cols-2 gap-12 max-w-4xl mx-auto mb-8"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <DiceRoll
+              team="red"
+              teamName={match.team_red_name}
+              teamColor={teamRedColor}
+              rollValue={match.team_red_roll}
+              isRolling={isRollingRed}
+              onRoll={handleRoll}
+              canRoll={
+                isCaptain &&
+                myTeam === "red" &&
+                !actions.find((a) => a.team === "red" && a.action_type === "roll")
+              }
+            />
+            <DiceRoll
+              team="blue"
+              teamName={match.team_blue_name}
+              teamColor={teamBlueColor}
+              rollValue={match.team_blue_roll}
+              isRolling={isRollingBlue}
+              onRoll={handleRoll}
+              canRoll={
+                isCaptain &&
+                myTeam === "blue" &&
+                !actions.find((a) => a.team === "blue" && a.action_type === "roll")
+              }
+            />
+          </motion.div>
+        )}
+
+        {/* Preference Selection Phase */}
+        {match.status === "preference_selection" &&
+         match.roll_winner &&
+         (match.roll_winner === "red" || match.roll_winner === "blue") && (
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <PreferenceSelector
+              winnerTeam={match.roll_winner}
+              winnerName={
+                match.roll_winner === "red"
+                  ? match.team_red_name
+                  : match.team_blue_name
+              }
+              winnerColor={
+                match.roll_winner === "red" ? teamRedColor : teamBlueColor
+              }
+              loserName={
+                match.roll_winner === "red"
+                  ? match.team_blue_name
+                  : match.team_red_name
+              }
+              canSelect={isCaptain && myTeam === match.roll_winner}
+              onSelect={handlePreferenceSelect}
+              selectedPreference={match.roll_winner_preference}
+            />
+          </motion.div>
+        )}
+
         {/* Pick Order Timeline */}
-        <div className="bg-black/30 backdrop-blur-sm border-b border-white/10 py-3 px-6">
-          <div className="container mx-auto">
+        {(match.status === "banning" ||
+          match.status === "picking" ||
+          match.status === "completed") && (
+          <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl py-4 px-6 mb-8">
             <div className="flex items-center gap-2 overflow-x-auto pb-2">
               {Array.from({ length: numPicks + 1 }).map((_, index) => {
                 const pick = getPickedMaps()[index];
@@ -596,313 +557,221 @@ export default function DraftPage() {
               })}
             </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Main Content - 3 Column Layout */}
-      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
-        {/* Left - Red Team Picks & Bans */}
-        <div className="w-64 flex flex-col gap-4">
-          {/* Red Team Picks */}
-          <div className="flex-1 bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30 overflow-y-auto">
-            <h3 className="text-red-400 font-bold text-lg mb-3 flex items-center gap-2">
-              <Trophy className="w-5 h-5" />
-              Red Picks
-            </h3>
-            <div className="space-y-2">
-              {getPickedMaps()
-                .filter((p) => p.team === "red")
-                .map((pick, index) => (
-                  <motion.div
-                    key={pick.beatmap.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="relative rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={pick.beatmap.cover_url}
-                      alt={pick.beatmap.title}
-                      className="w-full h-24 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
-                      <div className="text-white font-bold text-sm">
-                        {pick.beatmap.mod_pool}
-                        {pick.beatmap.mod_index}
-                      </div>
-                      <div className="text-white/80 text-xs truncate">
-                        {pick.beatmap.title}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-            </div>
-          </div>
-
-          {/* Red Team Bans */}
-          <div className="bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30">
-            <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Red Bans
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {getBannedMaps()
-                .filter((b) => b.team === "red")
-                .map((ban, index) => (
-                  <motion.div
-                    key={ban.beatmap.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={ban.beatmap.cover_url}
-                      alt={ban.beatmap.title}
-                      className="w-full h-16 object-cover grayscale brightness-50"
-                    />
-                    <div className="absolute inset-0 bg-red-600/60 flex items-center justify-center border border-red-400">
-                      <span className="text-white font-bold text-xs">
-                        {ban.beatmap.mod_pool}
-                        {ban.beatmap.mod_index}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Center - Map Pool */}
-        <div className="flex-1 bg-gradient-to-br from-purple-950/30 via-gray-950/40 to-purple-950/30 backdrop-blur-md rounded-xl p-6 border-2 border-purple-500/20 overflow-y-auto">
-          <h2 className="text-white font-bold text-2xl mb-4 text-center uppercase tracking-wider">
-            Map Pool
-          </h2>
-          <div className="space-y-6">
-            {Object.entries(groupedBeatmaps).map(([modPool, maps]) => {
-              const isTiebreaker = modPool === "TB";
-
-              return (
-                <div key={modPool}>
-                  <div className="flex items-center justify-center gap-3 mb-3">
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent to-purple-500/50"></div>
-                    <h3 className="text-white font-bold text-xl px-4 py-1 bg-purple-500/20 rounded-full border border-purple-400/30">
-                      {modPool}
-                    </h3>
-                    <div className="h-px flex-1 bg-gradient-to-l from-transparent to-purple-500/50"></div>
-                    {isTiebreaker && (
-                      <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-500 rounded-full text-yellow-400 text-xs font-bold">
-                        TIEBREAKER
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    <AnimatePresence>
-                      {maps.map((map) => {
-                        const isBanned = actions.some(
-                          (a) => a.action_type === "ban" && a.beatmap_id === map.id
-                        );
-                        const isPicked = actions.some(
-                          (a) => a.action_type === "pick" && a.beatmap_id === map.id
-                        );
-                        const pickedByTeam = actions.find(
-                          (a) => a.action_type === "pick" && a.beatmap_id === map.id
-                        )?.team;
-
-                        const canInteract =
-                          !isTiebreaker &&
-                          isCaptain &&
-                          match.current_team === myTeam &&
-                          !isBanned &&
-                          !isPicked;
-
-                        return (
-                          <motion.div
-                            key={map.id}
-                            layout
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            whileHover={
-                              canInteract ? { scale: 1.05, zIndex: 10 } : {}
-                            }
-                            className="relative rounded-xl overflow-hidden group cursor-pointer shadow-lg"
-                          >
-                            <img
-                              src={map.cover_url}
-                              alt={map.title}
-                              className={`w-full h-32 object-cover transition-all duration-300 ${
-                                isBanned
-                                  ? "grayscale brightness-50"
-                                  : isPicked
-                                  ? "brightness-75"
-                                  : canInteract
-                                  ? "group-hover:brightness-110"
-                                  : ""
-                              }`}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3">
-                              <div className="text-white font-bold text-sm">
-                                {map.mod_pool}
-                                {map.mod_index}
-                              </div>
-                              <div className="text-white text-xs truncate">
-                                {map.title}
-                              </div>
-                              <div className="text-gray-300 text-xs">
-                                {map.star_rating.toFixed(2)}★
-                              </div>
-                            </div>
-
-                            {/* Banned Overlay */}
-                            {isBanned && (
-                              <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="absolute inset-0 bg-gradient-to-br from-red-600/90 to-gray-900/90 flex flex-col items-center justify-center border-2 border-red-500"
-                              >
-                                <Shield className="w-8 h-8 text-white mb-1" />
-                                <span className="text-white font-bold text-sm">
-                                  BANNED
-                                </span>
-                              </motion.div>
-                            )}
-
-                            {/* Picked Overlay */}
-                            {isPicked && (
-                              <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className={`absolute inset-0 ${
-                                  pickedByTeam === "red"
-                                    ? "bg-gradient-to-br from-red-500/80 to-red-900/80 border-red-400"
-                                    : "bg-gradient-to-br from-blue-500/80 to-blue-900/80 border-blue-400"
-                                } flex flex-col items-center justify-center border-2`}
-                              >
-                                <Trophy className="w-8 h-8 text-white mb-1" />
-                                <span className="text-white font-bold text-sm">
-                                  PICKED
-                                </span>
-                                <span className="text-white/90 text-xs mt-1">
-                                  {pickedByTeam === "red" ? "RED" : "BLUE"}
-                                </span>
-                              </motion.div>
-                            )}
-
-                            {/* Tiebreaker Lock */}
-                            {isTiebreaker && !isBanned && !isPicked && (
-                              <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/50 to-orange-600/50 flex flex-col items-center justify-center border-2 border-yellow-500 pointer-events-none">
-                                <span className="text-white font-bold text-xs">
-                                  🔒 FINAL MAP 🔒
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Ban Button */}
-                            {canInteract && match.status === "banning" && (
-                              <motion.button
-                                onClick={() => handleBan(map.id)}
-                                className="absolute inset-0 bg-red-600/0 hover:bg-red-600/90 transition-all flex items-center justify-center"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <span className="text-white font-bold text-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                  ⛔ BAN
-                                </span>
-                              </motion.button>
-                            )}
-
-                            {/* Pick Button */}
-                            {canInteract && match.status === "picking" && (
-                              <motion.button
-                                onClick={() => handlePick(map.id)}
-                                className="absolute inset-0 bg-green-600/0 hover:bg-green-600/90 transition-all flex items-center justify-center"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <span className="text-white font-bold text-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                  ✓ PICK
-                                </span>
-                              </motion.button>
-                            )}
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
+        {/* Main Draft Layout */}
+        {(match.status === "banning" ||
+          match.status === "picking" ||
+          match.status === "completed") && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* Red Team Column */}
+            <div className="col-span-2 space-y-4">
+              {/* Red Picks */}
+              <div className="bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30">
+                <h3 className="text-red-400 font-bold text-lg mb-3 flex items-center gap-2">
+                  <Trophy className="w-5 h-5" />
+                  Red Picks
+                </h3>
+                <div className="space-y-2">
+                  {getPickedMaps()
+                    .filter((p) => p.team === "red")
+                    .map((pick) => (
+                      <motion.div
+                        key={pick.beatmap.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="relative rounded-lg overflow-hidden"
+                      >
+                        <img
+                          src={pick.beatmap.cover_url}
+                          alt={pick.beatmap.title}
+                          className="w-full h-20 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
+                          <div className="text-white font-bold text-sm">
+                            {pick.beatmap.mod_pool}
+                            {pick.beatmap.mod_index}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
 
-        {/* Right - Blue Team Picks & Bans */}
-        <div className="w-64 flex flex-col gap-4">
-          {/* Blue Team Picks */}
-          <div className="flex-1 bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30 overflow-y-auto">
-            <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">
-              <Trophy className="w-5 h-5" />
-              Blue Picks
-            </h3>
-            <div className="space-y-2">
-              {getPickedMaps()
-                .filter((p) => p.team === "blue")
-                .map((pick, index) => (
-                  <motion.div
-                    key={pick.beatmap.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="relative rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={pick.beatmap.cover_url}
-                      alt={pick.beatmap.title}
-                      className="w-full h-24 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
-                      <div className="text-white font-bold text-sm">
-                        {pick.beatmap.mod_pool}
-                        {pick.beatmap.mod_index}
+              {/* Red Bans */}
+              <div className="bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30">
+                <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Bans
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {getBannedMaps()
+                    .filter((b) => b.team === "red")
+                    .map((ban) => (
+                      <motion.div
+                        key={ban.beatmap.id}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative rounded-lg overflow-hidden"
+                      >
+                        <img
+                          src={ban.beatmap.cover_url}
+                          alt={ban.beatmap.title}
+                          className="w-full h-12 object-cover grayscale brightness-50"
+                        />
+                        <div className="absolute inset-0 bg-red-600/60 flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">
+                            {ban.beatmap.mod_pool}
+                            {ban.beatmap.mod_index}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Map Pool */}
+            <div className="col-span-8 bg-gradient-to-br from-purple-950/30 via-gray-950/40 to-purple-950/30 backdrop-blur-md rounded-xl p-6 border-2 border-purple-500/20 max-h-[70vh] overflow-y-auto">
+              <h2 className="text-white font-bold text-3xl mb-6 text-center uppercase tracking-wider">
+                Map Pool
+              </h2>
+              <div className="space-y-8">
+                {Object.entries(groupedBeatmaps).map(([modPool, maps]) => {
+                  const isTiebreaker = modPool === "TB";
+
+                  return (
+                    <div key={modPool}>
+                      <div className="flex items-center justify-center gap-3 mb-4">
+                        <div className="h-px flex-1 bg-gradient-to-r from-transparent to-purple-500/50"></div>
+                        <h3 className="text-white font-bold text-2xl px-6 py-2 bg-purple-500/20 rounded-full border border-purple-400/30">
+                          {modPool}
+                        </h3>
+                        <div className="h-px flex-1 bg-gradient-to-l from-transparent to-purple-500/50"></div>
                       </div>
-                      <div className="text-white/80 text-xs truncate">
-                        {pick.beatmap.title}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {maps.map((map) => {
+                          const isBanned = actions.some(
+                            (a) => a.action_type === "ban" && a.beatmap_id === map.id
+                          );
+                          const isPicked = actions.some(
+                            (a) => a.action_type === "pick" && a.beatmap_id === map.id
+                          );
+                          const pickedByTeam = actions.find(
+                            (a) => a.action_type === "pick" && a.beatmap_id === map.id
+                          )?.team as "red" | "blue" | undefined;
+
+                          const canInteract =
+                            !isTiebreaker &&
+                            isCaptain &&
+                            match.current_team === myTeam &&
+                            !isBanned &&
+                            !isPicked;
+
+                          return (
+                            <EnhancedMapCard
+                              key={map.id}
+                              beatmap={map}
+                              status={
+                                isBanned
+                                  ? "banned"
+                                  : isPicked
+                                  ? "picked"
+                                  : isTiebreaker
+                                  ? "locked"
+                                  : "available"
+                              }
+                              pickedByTeam={pickedByTeam}
+                              teamRedColor={teamRedColor}
+                              teamBlueColor={teamBlueColor}
+                              canInteract={canInteract}
+                              interactionMode={
+                                match.status === "banning"
+                                  ? "ban"
+                                  : match.status === "picking"
+                                  ? "pick"
+                                  : undefined
+                              }
+                              onBan={() => handleBan(map.id)}
+                              onPick={() => handlePick(map.id)}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
-                  </motion.div>
-                ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Blue Team Bans */}
-          <div className="bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30">
-            <h3 className="text-blue-400 font-bold text-sm mb-2 flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Blue Bans
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {getBannedMaps()
-                .filter((b) => b.team === "blue")
-                .map((ban, index) => (
-                  <motion.div
-                    key={ban.beatmap.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={ban.beatmap.cover_url}
-                      alt={ban.beatmap.title}
-                      className="w-full h-16 object-cover grayscale brightness-50"
-                    />
-                    <div className="absolute inset-0 bg-blue-600/60 flex items-center justify-center border border-blue-400">
-                      <span className="text-white font-bold text-xs">
-                        {ban.beatmap.mod_pool}
-                        {ban.beatmap.mod_index}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
+            {/* Blue Team Column */}
+            <div className="col-span-2 space-y-4">
+              {/* Blue Picks */}
+              <div className="bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30">
+                <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">
+                  <Trophy className="w-5 h-5" />
+                  Blue Picks
+                </h3>
+                <div className="space-y-2">
+                  {getPickedMaps()
+                    .filter((p) => p.team === "blue")
+                    .map((pick) => (
+                      <motion.div
+                        key={pick.beatmap.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="relative rounded-lg overflow-hidden"
+                      >
+                        <img
+                          src={pick.beatmap.cover_url}
+                          alt={pick.beatmap.title}
+                          className="w-full h-20 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
+                          <div className="text-white font-bold text-sm">
+                            {pick.beatmap.mod_pool}
+                            {pick.beatmap.mod_index}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Blue Bans */}
+              <div className="bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30">
+                <h3 className="text-blue-400 font-bold text-sm mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Bans
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {getBannedMaps()
+                    .filter((b) => b.team === "blue")
+                    .map((ban) => (
+                      <motion.div
+                        key={ban.beatmap.id}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative rounded-lg overflow-hidden"
+                      >
+                        <img
+                          src={ban.beatmap.cover_url}
+                          alt={ban.beatmap.title}
+                          className="w-full h-12 object-cover grayscale brightness-50"
+                        />
+                        <div className="absolute inset-0 bg-blue-600/60 flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">
+                            {ban.beatmap.mod_pool}
+                            {ban.beatmap.mod_index}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

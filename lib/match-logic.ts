@@ -1,12 +1,13 @@
 import { supabase } from "./supabase";
-import type { Match, MatchAction } from "@/types";
+import type { Match, MatchAction, RollPreference } from "@/types";
 
 const TIMER_DURATION = 60; // seconds
 
 export async function processMatchAction(
   matchId: string,
-  actionType: "roll" | "ban" | "pick",
-  team: "red" | "blue"
+  actionType: "roll" | "ban" | "pick" | "preference",
+  team: "red" | "blue",
+  preference?: RollPreference
 ) {
   // Get current match state
   const { data: match } = await supabase
@@ -84,22 +85,55 @@ export async function processMatchAction(
         return;
       }
 
-      // Start ban phase
-      if (numBans > 0) {
-        newStatus = "banning";
-        newCurrentTeam = rollWinner;
-        timerEndsAt = new Date(
-          Date.now() + TIMER_DURATION * 1000
-        ).toISOString();
-      } else {
-        // No bans, go straight to picking
-        newStatus = "picking";
-        newCurrentTeam = rollWinner;
-        timerEndsAt = new Date(
-          Date.now() + TIMER_DURATION * 1000
-        ).toISOString();
-      }
+      // Move to preference selection phase
+      newStatus = "preference_selection";
+      newCurrentTeam = rollWinner;
+      timerEndsAt = new Date(Date.now() + TIMER_DURATION * 1000).toISOString();
     }
+  }
+
+  // Handle preference selection phase
+  if (actionType === "preference") {
+    if (!preference) return;
+
+    // Determine pick/ban order based on preference
+    let firstBanTeam: "red" | "blue";
+    let firstPickTeam: "red" | "blue";
+
+    if (preference === "first_ban") {
+      firstBanTeam = team;
+      firstPickTeam = team === "red" ? "blue" : "red";
+    } else if (preference === "second_ban") {
+      firstBanTeam = team === "red" ? "blue" : "red";
+      firstPickTeam = team;
+    } else if (preference === "first_pick") {
+      firstPickTeam = team;
+      firstBanTeam = team === "red" ? "blue" : "red";
+    } else {
+      // second_pick
+      firstPickTeam = team === "red" ? "blue" : "red";
+      firstBanTeam = team;
+    }
+
+    // Start ban phase if there are bans, otherwise go to picking
+    if (numBans > 0) {
+      newStatus = "banning";
+      newCurrentTeam = firstBanTeam;
+      timerEndsAt = new Date(Date.now() + TIMER_DURATION * 1000).toISOString();
+    } else {
+      // No bans, go straight to picking
+      newStatus = "picking";
+      newCurrentTeam = firstPickTeam;
+      timerEndsAt = new Date(Date.now() + TIMER_DURATION * 1000).toISOString();
+    }
+
+    // Store the preference and pick order for later reference
+    await supabase
+      .from("matches")
+      .update({
+        roll_winner_preference: preference,
+      } as never)
+      .eq("id", matchId);
   }
 
   // Handle ban phase

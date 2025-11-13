@@ -3,10 +3,12 @@ export type Team = "red" | "blue" | "tiebreaker";
 export type MatchStatus =
   | "waiting"
   | "rolling"
+  | "preference_selection"
   | "banning"
   | "picking"
   | "completed";
-export type ActionType = "ban" | "pick" | "roll";
+export type ActionType = "ban" | "pick" | "roll" | "preference";
+export type RollPreference = "first_pick" | "second_pick" | "first_ban" | "second_ban";
 
 export interface Stage {
   id: string;
@@ -54,6 +56,14 @@ export interface Match {
   current_team: Team | null;
   timer_ends_at: string | null;
   created_at: string;
+  // New customization fields
+  team_red_color?: string;
+  team_blue_color?: string;
+  team_red_logo_url?: string;
+  team_blue_logo_url?: string;
+  roll_winner_preference?: RollPreference | null;
+  tournament_name?: string;
+  tournament_logo_url?: string;
 }
 
 export interface MatchAction {
@@ -64,6 +74,7 @@ export interface MatchAction {
   beatmap_id: string | null;
   order_index: number;
   created_at: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface OsuBeatmap {
