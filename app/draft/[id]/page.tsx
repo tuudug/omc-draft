@@ -357,7 +357,7 @@ export default function DraftPage() {
   const teamBlueColor = match.team_blue_color || "#3B82F6";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 overflow-hidden flex flex-col">
       {/* Audio Manager */}
       <AudioManager
         enabled={audioEnabled}
@@ -387,23 +387,23 @@ export default function DraftPage() {
       />
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-8">
+      <div className="flex-1 flex flex-col min-h-0 px-3 py-2">
         {/* Tournament Header */}
         <motion.div
-          className="text-center mb-8"
+          className="text-center mb-2"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-5xl font-bold text-white mb-2">
+          <h1 className="text-xl font-bold text-white">
             {match.tournament_name || "osu! Mongolia Cup 2025"}
           </h1>
-          <div className="text-2xl text-purple-300">
+          <div className="text-sm text-purple-300">
             {match.team_red_name} vs {match.team_blue_name}
           </div>
         </motion.div>
 
         {/* Phase Indicator */}
-        <div className="mb-8">
+        <div className="mb-2">
           <PhaseIndicator
             status={match.status}
             currentTeam={match.current_team === "red" || match.current_team === "blue" ? match.current_team : undefined}
@@ -429,7 +429,7 @@ export default function DraftPage() {
         {/* Rolling Phase */}
         {match.status === "rolling" && (
           <motion.div
-            className="grid grid-cols-2 gap-12 max-w-4xl mx-auto mb-8"
+            className="grid grid-cols-2 gap-6 max-w-2xl mx-auto mb-2"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
           >
@@ -467,7 +467,7 @@ export default function DraftPage() {
          match.roll_winner &&
          (match.roll_winner === "red" || match.roll_winner === "blue") && (
           <motion.div
-            className="mb-8"
+            className="mb-2"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -486,9 +486,18 @@ export default function DraftPage() {
                   ? match.team_blue_name
                   : match.team_red_name
               }
-              canSelect={isCaptain && myTeam === match.roll_winner}
+              loserColor={
+                match.roll_winner === "red" ? teamBlueColor : teamRedColor
+              }
+              canSelect={isCaptain && myTeam === match.current_team}
               onSelect={handlePreferenceSelect}
-              selectedPreference={match.roll_winner_preference}
+              winnerPreference={match.roll_winner_preference}
+              loserPreference={match.roll_loser_preference}
+              currentTeam={
+                match.current_team === "tiebreaker"
+                  ? null
+                  : match.current_team
+              }
             />
           </motion.div>
         )}
@@ -497,8 +506,8 @@ export default function DraftPage() {
         {(match.status === "banning" ||
           match.status === "picking" ||
           match.status === "completed") && (
-          <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl py-4 px-6 mb-8">
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-lg py-2 px-3 mb-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
               {Array.from({ length: numPicks + 1 }).map((_, index) => {
                 const pick = getPickedMaps()[index];
                 const isTB = index === numPicks;
@@ -512,12 +521,12 @@ export default function DraftPage() {
                     className={`flex-shrink-0 relative ${
                       pick
                         ? isTB || pick.team === "tiebreaker"
-                          ? "ring-2 ring-yellow-400"
+                          ? "ring-1 ring-yellow-400"
                           : pick.team === "red"
-                          ? "ring-2 ring-red-400"
-                          : "ring-2 ring-blue-400"
-                        : "border-2 border-dashed border-gray-600"
-                    } rounded-lg overflow-hidden w-28 h-20 bg-gray-800/50`}
+                          ? "ring-1 ring-red-400"
+                          : "ring-1 ring-blue-400"
+                        : "border border-dashed border-gray-600"
+                    } rounded overflow-hidden w-16 h-12 bg-gray-800/50`}
                   >
                     {pick ? (
                       <>
@@ -563,16 +572,16 @@ export default function DraftPage() {
         {(match.status === "banning" ||
           match.status === "picking" ||
           match.status === "completed") && (
-          <div className="grid grid-cols-12 gap-6">
+          <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
             {/* Red Team Column */}
-            <div className="col-span-2 space-y-4">
+            <div className="col-span-2 flex flex-col gap-2 min-h-0">
               {/* Red Picks */}
-              <div className="bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30">
-                <h3 className="text-red-400 font-bold text-lg mb-3 flex items-center gap-2">
-                  <Trophy className="w-5 h-5" />
+              <div className="flex-1 bg-red-950/20 backdrop-blur-md rounded-lg p-2 border border-red-500/30 overflow-y-auto">
+                <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5" />
                   Red Picks
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {getPickedMaps()
                     .filter((p) => p.team === "red")
                     .map((pick) => (
@@ -580,15 +589,15 @@ export default function DraftPage() {
                         key={pick.beatmap.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="relative rounded-lg overflow-hidden"
+                        className="relative rounded overflow-hidden"
                       >
                         <img
                           src={pick.beatmap.cover_url}
                           alt={pick.beatmap.title}
-                          className="w-full h-20 object-cover"
+                          className="w-full h-12 object-cover"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
-                          <div className="text-white font-bold text-sm">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-1">
+                          <div className="text-white font-bold text-xs">
                             {pick.beatmap.mod_pool}
                             {pick.beatmap.mod_index}
                           </div>
@@ -599,12 +608,12 @@ export default function DraftPage() {
               </div>
 
               {/* Red Bans */}
-              <div className="bg-red-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-red-500/30">
-                <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
+              <div className="bg-red-950/20 backdrop-blur-md rounded-lg p-2 border border-red-500/30">
+                <h3 className="text-red-400 font-bold text-xs mb-1.5 flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
                   Bans
                 </h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1">
                   {getBannedMaps()
                     .filter((b) => b.team === "red")
                     .map((ban) => (
@@ -612,12 +621,12 @@ export default function DraftPage() {
                         key={ban.beatmap.id}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="relative rounded-lg overflow-hidden"
+                        className="relative rounded overflow-hidden"
                       >
                         <img
                           src={ban.beatmap.cover_url}
                           alt={ban.beatmap.title}
-                          className="w-full h-12 object-cover grayscale brightness-50"
+                          className="w-full h-8 object-cover grayscale brightness-50"
                         />
                         <div className="absolute inset-0 bg-red-600/60 flex items-center justify-center">
                           <span className="text-white font-bold text-xs">
@@ -632,24 +641,24 @@ export default function DraftPage() {
             </div>
 
             {/* Map Pool */}
-            <div className="col-span-8 bg-gradient-to-br from-purple-950/30 via-gray-950/40 to-purple-950/30 backdrop-blur-md rounded-xl p-6 border-2 border-purple-500/20 max-h-[70vh] overflow-y-auto">
-              <h2 className="text-white font-bold text-3xl mb-6 text-center uppercase tracking-wider">
+            <div className="col-span-8 bg-gradient-to-br from-purple-950/30 via-gray-950/40 to-purple-950/30 backdrop-blur-md rounded-lg p-3 border border-purple-500/20 overflow-y-auto">
+              <h2 className="text-white font-bold text-lg mb-3 text-center uppercase tracking-wide">
                 Map Pool
               </h2>
-              <div className="space-y-8">
+              <div className="space-y-3">
                 {Object.entries(groupedBeatmaps).map(([modPool, maps]) => {
                   const isTiebreaker = modPool === "TB";
 
                   return (
                     <div key={modPool}>
-                      <div className="flex items-center justify-center gap-3 mb-4">
+                      <div className="flex items-center justify-center gap-2 mb-2">
                         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-purple-500/50"></div>
-                        <h3 className="text-white font-bold text-2xl px-6 py-2 bg-purple-500/20 rounded-full border border-purple-400/30">
+                        <h3 className="text-white font-bold text-sm px-3 py-1 bg-purple-500/20 rounded border border-purple-400/30">
                           {modPool}
                         </h3>
                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-purple-500/50"></div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {maps.map((map) => {
                           const isBanned = actions.some(
                             (a) => a.action_type === "ban" && a.beatmap_id === map.id
@@ -705,14 +714,14 @@ export default function DraftPage() {
             </div>
 
             {/* Blue Team Column */}
-            <div className="col-span-2 space-y-4">
+            <div className="col-span-2 flex flex-col gap-2 min-h-0">
               {/* Blue Picks */}
-              <div className="bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30">
-                <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">
-                  <Trophy className="w-5 h-5" />
+              <div className="flex-1 bg-blue-950/20 backdrop-blur-md rounded-lg p-2 border border-blue-500/30 overflow-y-auto">
+                <h3 className="text-blue-400 font-bold text-sm mb-2 flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5" />
                   Blue Picks
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {getPickedMaps()
                     .filter((p) => p.team === "blue")
                     .map((pick) => (
@@ -720,15 +729,15 @@ export default function DraftPage() {
                         key={pick.beatmap.id}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="relative rounded-lg overflow-hidden"
+                        className="relative rounded overflow-hidden"
                       >
                         <img
                           src={pick.beatmap.cover_url}
                           alt={pick.beatmap.title}
-                          className="w-full h-20 object-cover"
+                          className="w-full h-12 object-cover"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-2">
-                          <div className="text-white font-bold text-sm">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-1">
+                          <div className="text-white font-bold text-xs">
                             {pick.beatmap.mod_pool}
                             {pick.beatmap.mod_index}
                           </div>
@@ -739,12 +748,12 @@ export default function DraftPage() {
               </div>
 
               {/* Blue Bans */}
-              <div className="bg-blue-950/20 backdrop-blur-md rounded-xl p-4 border-2 border-blue-500/30">
-                <h3 className="text-blue-400 font-bold text-sm mb-2 flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
+              <div className="bg-blue-950/20 backdrop-blur-md rounded-lg p-2 border border-blue-500/30">
+                <h3 className="text-blue-400 font-bold text-xs mb-1.5 flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
                   Bans
                 </h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1">
                   {getBannedMaps()
                     .filter((b) => b.team === "blue")
                     .map((ban) => (
@@ -752,12 +761,12 @@ export default function DraftPage() {
                         key={ban.beatmap.id}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="relative rounded-lg overflow-hidden"
+                        className="relative rounded overflow-hidden"
                       >
                         <img
                           src={ban.beatmap.cover_url}
                           alt={ban.beatmap.title}
-                          className="w-full h-12 object-cover grayscale brightness-50"
+                          className="w-full h-8 object-cover grayscale brightness-50"
                         />
                         <div className="absolute inset-0 bg-blue-600/60 flex items-center justify-center">
                           <span className="text-white font-bold text-xs">
