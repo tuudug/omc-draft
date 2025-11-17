@@ -101,17 +101,28 @@ export async function processMatchAction(
 
     if (isWinner) {
       // Winner selected, now let loser choose from remaining 3 options
-      const loserTeam = team === "red" ? "blue" : "red";
+      const loserTeam: "red" | "blue" = team === "red" ? "blue" : "red";
 
-      await supabase
+      console.log(`Winner (${team}) selected ${preference}, now ${loserTeam} should select`);
+
+      // Update match to let loser select
+      const { data: updateData, error: updateError } = await supabase
         .from("matches")
         .update({
           roll_winner_preference: preference,
           current_team: loserTeam,
-          status: "preference_selection",
+          status: "preference_selection" as MatchStatus,
           timer_ends_at: new Date(Date.now() + TIMER_DURATION * 1000).toISOString(),
         } as never)
-        .eq("id", matchId);
+        .eq("id", matchId)
+        .select();
+
+      if (updateError) {
+        console.error("Error updating match for loser selection:", updateError);
+      } else {
+        console.log("Successfully updated match, current_team is now:", loserTeam);
+        console.log("Update data:", updateData);
+      }
 
       return; // Stay in preference_selection phase
     } else {
