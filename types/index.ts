@@ -6,7 +6,8 @@ export type MatchStatus =
   | "preference_selection"
   | "banning"
   | "picking"
-  | "completed";
+  | "completed"
+  | "paused";
 export type ActionType = "ban" | "pick" | "roll" | "preference";
 export type RollPreference = "first_pick" | "second_pick" | "first_ban" | "second_ban";
 
@@ -16,6 +17,8 @@ export interface Stage {
   best_of: number;
   num_bans: number;
   created_at: string;
+  timer_duration: number;
+  draft_pattern: { action: ActionType; team: 1 | 2 }[];
 }
 
 export interface Beatmap {
@@ -48,6 +51,7 @@ export interface Match {
   team_red_captain_token: string;
   team_blue_captain_token: string;
   spectator_token: string;
+  admin_token?: string;
   roll_winner: Team | null;
   team_red_roll: number | null;
   team_blue_roll: number | null;
@@ -55,6 +59,10 @@ export interface Match {
   current_action: string | null;
   current_team: Team | null;
   timer_ends_at: string | null;
+  paused_at?: string | null;
+  paused_remaining_seconds?: number | null;
+  current_pick_number?: number;
+  current_ban_number?: number;
   created_at: string;
   // New customization fields
   team_red_color?: string;

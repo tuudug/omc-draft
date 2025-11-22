@@ -29,6 +29,7 @@ export default function DraftPage() {
   const [actions, setActions] = useState<MatchAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCaptain, setIsCaptain] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [myTeam, setMyTeam] = useState<"red" | "blue" | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isHandlingTimeout, setIsHandlingTimeout] = useState(false);
@@ -132,13 +133,16 @@ export default function DraftPage() {
       const typedMatchData = matchData as Match;
       setMatch(typedMatchData);
 
-      // Check if user is captain
+      // Check if user is captain or admin
       if (token === typedMatchData.team_red_captain_token) {
         setIsCaptain(true);
         setMyTeam("red");
       } else if (token === typedMatchData.team_blue_captain_token) {
         setIsCaptain(true);
         setMyTeam("blue");
+      } else if (token === typedMatchData.admin_token) {
+        setIsCaptain(true); // Admins act as super-captains
+        setIsAdmin(true);
       }
 
       // Fetch stage info
@@ -269,6 +273,32 @@ export default function DraftPage() {
     }
   };
 
+  const handleUndo = async () => {
+    if (!isAdmin) return;
+    try {
+      await fetch(`/api/matches/${matchId}/admin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "undo" }),
+      });
+    } catch (error) {
+      console.error("Error performing undo:", error);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!isAdmin) return;
+    try {
+      await fetch(`/api/matches/${matchId}/admin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" }),
+      });
+    } catch (error) {
+      console.error("Error performing reset:", error);
+    }
+  };
+
   const getAvailableMaps = () => {
     const bannedIds = getBannedMaps().map((b) => b.beatmap.id);
     const pickedIds = getPickedMaps().map((p) => p.beatmap.id);
@@ -370,11 +400,13 @@ export default function DraftPage() {
 
       {/* Admin Controls */}
       <AdminControls
-        isAdmin={isCaptain}
+        isAdmin={isAdmin}
         audioEnabled={audioEnabled}
         onToggleAudio={() => setAudioEnabled(!audioEnabled)}
         onExport={() => setShowExportModal(true)}
-        canUndo={false}
+        onUndo={handleUndo}
+        onReset={handleReset}
+        canUndo={actions.length > 0}
       />
 
       {/* Export Modal */}

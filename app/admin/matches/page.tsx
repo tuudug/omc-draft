@@ -18,6 +18,7 @@ interface MatchLinks {
   team_red_url: string;
   team_blue_url: string;
   spectator_url: string;
+  admin_url: string;
 }
 
 export default function CreateMatchPage() {
@@ -180,6 +181,30 @@ export default function CreateMatchPage() {
                 </div>
                 <code className="text-white text-sm break-all">
                   {matchLinks.spectator_url}
+                </code>
+              </div>
+
+              <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-300 font-medium">
+                    Admin URL (Full Control)
+                  </span>
+                  <button
+                    onClick={() =>
+                      copyToClipboard(matchLinks.admin_url, "admin")
+                    }
+                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    {copiedUrl === "admin" ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                    Copy
+                  </button>
+                </div>
+                <code className="text-white text-sm break-all">
+                  {matchLinks.admin_url}
                 </code>
               </div>
             </div>

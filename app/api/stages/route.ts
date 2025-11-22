@@ -6,7 +6,7 @@ import type { OsuBeatmap } from "@/types";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, best_of, num_bans, beatmaps } = body;
+    const { name, best_of, num_bans, beatmaps, timer_duration, draft_pattern } = body;
 
     // Validate input
     if (!name || !best_of || num_bans === undefined || !beatmaps) {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Create stage
     const { data: stage, error: stageError } = await supabase
       .from("stages")
-      .insert({ name, best_of, num_bans } as never)
+      .insert({ name, best_of, num_bans, timer_duration, draft_pattern } as never)
       .select()
       .single();
 
