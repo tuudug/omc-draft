@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     const team_red_captain_token = generateToken();
     const team_blue_captain_token = generateToken();
     const spectator_token = generateToken();
+    const admin_token = generateToken();
 
     // Create match
     const { data: match, error: matchError } = await supabase
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
         team_red_captain_token,
         team_blue_captain_token,
         spectator_token,
+        admin_token,
         status: "waiting",
       } as never)
       .select()
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
       team_red_url: `${baseUrl}/draft/${matchData.id}?token=${team_red_captain_token}&team=red`,
       team_blue_url: `${baseUrl}/draft/${matchData.id}?token=${team_blue_captain_token}&team=blue`,
       spectator_url: `${baseUrl}/draft/${matchData.id}?token=${spectator_token}`,
+      admin_url: `${baseUrl}/draft/${matchData.id}?token=${admin_token}&role=admin`,
     });
   } catch (error) {
     console.error("Error in create match:", error);
